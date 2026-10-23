@@ -13,7 +13,7 @@ templates = Jinja2Templates(directory="templates")
 ### App Url 
 
 @app.get('/')
-async def index(request : Request)
+async def index(request : Request):
     return templates.TemplateResponse(request, 'index.html', {
 
     })
