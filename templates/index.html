@@ -1,9 +1,163 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
     <head>
-        <title></title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>LEGI RAG</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.13"></script>
+        <style type="text/tailwindcss">
+            @theme {
+                --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+                --font-mono: "JetBrains Mono", ui-monospace, monospace;
+                --color-accent: #4c6ef5;
+                --color-accent-hover: #3b5bdb;
+            }
+        </style>
     </head>
-    <body>
-        The content of the document...
+    <body class="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased dark:bg-slate-900 dark:text-slate-200">
+        <div class="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-10 sm:py-16">
+
+            <header class="mb-8 text-center">
+                <a href="/" class="inline-block">
+                    <h1 class="font-mono text-3xl font-bold tracking-tight sm:text-4xl">
+                        LEGI <span class="text-accent">RAG</span>
+                    </h1>
+                </a>
+                <p class="mt-2 text-slate-500 dark:text-slate-400">
+                    Posez une question sur la convention collective Syntec
+                </p>
+            </header>
+
+            <main class="flex-1">
+                <form id="ask-form" action="/ask" method="POST" class="mb-4">
+                    <label for="question" class="sr-only">Votre question</label>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <div class="relative flex-1">
+                            <svg class="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0Z"/>
+                            </svg>
+                            <input type="text" id="question" name="text_request"
+                                   value="{{ text_request or '' }}" required autofocus autocomplete="off"
+                                   placeholder="Ex : combien de jours de congés pour un mariage ?"
+                                   class="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-4 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-800">
+                        </div>
+                        <button type="submit" id="submit-btn"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/30 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70">
+                            <svg id="spinner" class="hidden size-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
+                                <path fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z" class="opacity-75"/>
+                            </svg>
+                            <span id="submit-label">Rechercher</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mb-10 flex flex-wrap justify-center gap-2 text-sm">
+                    {% for example in [
+                        "Durée de la période d'essai d'un cadre",
+                        "Indemnité de licenciement",
+                        "Congés pour événements familiaux",
+                        "Préavis de démission",
+                    ] %}
+                    <button type="button" data-example="{{ example }}"
+                            class="rounded-full border border-slate-300 px-3 py-1 text-slate-600 transition hover:border-accent hover:text-accent dark:border-slate-700 dark:text-slate-400">
+                        {{ example }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                {% if jackpot %}
+                <section class="mb-10" aria-labelledby="answer-title">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h2 id="answer-title" class="text-sm font-semibold uppercase tracking-wider text-accent">Réponse</h2>
+                        <button type="button" id="copy-btn"
+                                class="rounded-lg px-2.5 py-1 text-sm text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                            Copier
+                        </button>
+                    </div>
+                    <div class="rounded-xl border border-l-4 border-slate-200 border-l-accent bg-white p-6 shadow-sm dark:border-slate-700 dark:border-l-accent dark:bg-slate-800">
+                        <p id="answer-text" class="whitespace-pre-wrap leading-relaxed">{{ jackpot }}</p>
+                    </div>
+                </section>
+
+                <section aria-labelledby="articles-title">
+                    <h2 id="articles-title" class="mb-3 text-sm font-semibold uppercase tracking-wider text-accent">
+                        Articles retrouvés <span class="font-normal text-slate-400">({{ articles | length }})</span>
+                    </h2>
+                    <div class="space-y-3">
+                        {% for article in articles %}
+                        <details class="group rounded-xl border border-slate-200 bg-white shadow-sm transition open:border-accent/50 dark:border-slate-700 dark:bg-slate-800" {% if loop.first %}open{% endif %}>
+                            <summary class="flex cursor-pointer list-none items-start gap-4 p-4 [&::-webkit-details-marker]:hidden">
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-mono font-semibold">Article {{ article.num }}</p>
+                                    <p class="truncate text-sm text-slate-500 dark:text-slate-400" title="{{ article.section }}">{{ article.section }}</p>
+                                </div>
+                                <div class="flex shrink-0 flex-col items-end gap-1.5">
+                                    <span class="font-mono text-sm font-bold text-accent">{{ article.score }}</span>
+                                    <div class="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" aria-hidden="true">
+                                        <div class="h-full rounded-full bg-accent" style="width: {{ (article.score * 100) | round | int }}%"></div>
+                                    </div>
+                                </div>
+                                <svg class="mt-1 size-5 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/>
+                                </svg>
+                            </summary>
+                            <div class="border-t border-slate-200 px-4 py-4 dark:border-slate-700">
+                                <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">{{ article.content }}</p>
+                            </div>
+                        </details>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    <p>La réponse et les articles sources s'afficheront ici.</p>
+                </div>
+                {% endif %}
+            </main>
+
+            <footer class="mt-16 text-center text-xs text-slate-400">
+                Source : Légifrance — convention collective Syntec (IDCC 1486)
+            </footer>
+        </div>
+
+        <script>
+            const form = document.getElementById('ask-form');
+            const input = document.getElementById('question');
+            const button = document.getElementById('submit-btn');
+
+            // The LLM call takes a while: give feedback and block double submits
+            form.addEventListener('submit', () => {
+                button.disabled = true;
+                document.getElementById('spinner').classList.remove('hidden');
+                document.getElementById('submit-label').textContent = 'Recherche…';
+            });
+
+            document.querySelectorAll('[data-example]').forEach((chip) => {
+                chip.addEventListener('click', () => {
+                    input.value = chip.dataset.example;
+                    form.requestSubmit();
+                });
+            });
+
+            const copyBtn = document.getElementById('copy-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', async () => {
+                    await navigator.clipboard.writeText(document.getElementById('answer-text').innerText);
+                    copyBtn.textContent = 'Copié ✓';
+                    setTimeout(() => (copyBtn.textContent = 'Copier'), 1500);
+                });
+            }
+
+            // Back-navigation from bfcache would otherwise keep the button stuck in loading state
+            window.addEventListener('pageshow', () => {
+                button.disabled = false;
+                document.getElementById('spinner').classList.add('hidden');
+                document.getElementById('submit-label').textContent = 'Rechercher';
+            });
+        </script>
     </body>
 </html>
