@@ -27,8 +27,22 @@
                     </h1>
                 </a>
                 <p class="mt-2 text-slate-500 dark:text-slate-400">
-                    Posez une question sur la convention collective Syntec
+                    Posez une question sur la convention collective de votre choix !
                 </p>
+
+                <form id="ask-conv" action="/conv" method="POST" class="mt-4 flex items-center justify-center gap-2 text-sm">
+                    <label for="conv_request">Convention collective (IDCC)</label>
+                    <input name="conv_request" id="conv_request" value="{{ idcc or '1486' }}" required
+                           inputmode="numeric" pattern="[0-9]+" autocomplete="off"
+                           class="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono dark:border-slate-700 dark:bg-slate-800" />
+                    <button type="submit" id="conv-btn"
+                            class="rounded-lg bg-accent px-3 py-1 font-semibold text-white transition hover:bg-accent-hover disabled:cursor-wait disabled:opacity-70">Charger</button>
+                </form>
+                {% if conv_error %}
+                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ conv_error }}</p>
+                {% elif idcc %}
+                <p class="mt-2 text-xs text-slate-400">Convention chargée : IDCC {{ idcc }}</p>
+                {% endif %}
             </header>
 
             <main class="flex-1">
@@ -120,7 +134,7 @@
             </main>
 
             <footer class="mt-16 text-center text-xs text-slate-400">
-                Source : Légifrance — convention collective Syntec (IDCC 1486)
+                Source : Légifrance — convention collective IDCC {{ idcc }}
             </footer>
         </div>
 
@@ -141,6 +155,13 @@
                     input.value = chip.dataset.example;
                     form.requestSubmit();
                 });
+            });
+
+            // Loading a new convention re-embeds every article: can take a while
+            document.getElementById('ask-conv').addEventListener('submit', () => {
+                const convBtn = document.getElementById('conv-btn');
+                convBtn.disabled = true;
+                convBtn.textContent = 'Chargement…';
             });
 
             const copyBtn = document.getElementById('copy-btn');
